@@ -5,89 +5,53 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Swipe Type</title>
     <style>
-        body {
-            font-family: system-ui, sans-serif;
-            background: #eee;
-            width: 100%;
-            max-width: 700px;
-            margin: 0 auto;
-            padding: 40px 20px;
-            box-sizing: border-box;
-        }
+        body { font-family: system-ui, sans-serif; background: #eee; width: 100%; max-width: 700px; margin: 0 auto; padding: 40px 20px; box-sizing: border-box; }
         div { opacity: 0.8; }
         h1 { font-size: 1.5em; }
-        input {
-            width: 100%;
-            padding: 8px;
-            font-size: 1em;
-            border: 1px solid #ccc;
-            box-sizing: border-box;
-            font-family: inherit;
-        }
+        input { width: 100%; padding: 8px; font-size: 1em; border: 1px solid #ccc; box-sizing: border-box; font-family: inherit; }
         #status { margin-top: 8px; font-size: 0.9em; display: flex; justify-content: space-between; }
         #status .typing-stats { text-align: right; }
-        #results { margin-top: 8px; height: 150px; margin-bottom: 16px; }
-        #keyboard-container {
-            position: relative;
-            margin-top: 16px;
-            margin-bottom: 16px;
-            width: 100%;
-            aspect-ratio: 10 / 3;
-        }
-        #keyboard {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-        }
-        .key {
-            position: absolute;
-            width: 7%;
-            height: 30%;
-            background: #fff;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.9em;
-            text-transform: uppercase;
-            box-sizing: border-box;
-            transition: background-color 0.15s;
-        }
-        .key.active {
-            background: #a8d4ff;
-        }
-        #path-canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-        }
+        #results { margin-top: 8px; margin-bottom: 16px; }
+        #keyboard-container { position: relative; margin-top: 16px; margin-bottom: 16px; width: 100%; aspect-ratio: 10 / 3; }
+        #keyboard { position: absolute; width: 100%; height: 100%; }
+        .key { position: absolute; width: 7%; height: 30%; background: #fff; border: 1px solid #ccc; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.9em; text-transform: uppercase; box-sizing: border-box; transition: background-color 0.15s; }
+        .key.active { background: #a8d4ff; }
+        #path-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
         #explanation { margin-top: 16px; }
         #explanation h2 { font-size: 1.1em; }
-        .prediction {
-            display: flex;
-            padding: 4px 0;
-        }
+        .prediction { display: flex; align-items: baseline; padding: 4px 0; }
         .prediction .word { flex: 1; }
         .prediction .score { width: 80px; text-align: right; margin-right: 24px; }
         .prediction .popularity { width: 80px; text-align: right; }
         a { color: #348; }
+        .mode-toggle { display: flex; gap: 8px; margin-bottom: 12px; }
+        .mode-toggle button { padding: 6px 12px; border: 1px solid #ccc; background: #fff; border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 0.9em; }
+        .mode-toggle button.active { background: #348; color: #fff; border-color: #348; }
+        #sentence-container { display: none; margin-bottom: 12px; padding: 12px; background: #fff; border: 1px solid #ccc; border-radius: 4px; }
+        #sentence-container.visible { display: block; }
+        #sentence-display { font-size: 1.1em; min-height: 1.4em; }
+        #sentence-display .cursor { display: inline-block; width: 2px; height: 1em; background: #348; margin-left: 4px; animation: blink 1s infinite; }
+        @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+        #sentence-stats { font-size: 0.85em; color: #666; margin-top: 8px; }
     </style>
 </head>
 <body>
     <h1>Swipe Type</h1>
+    <div class="mode-toggle">
+        <button id="mode-word" class="active">Word Mode</button>
+        <button id="mode-sentence">Sentence Mode</button>
+    </div>
+    <div id="sentence-container">
+        <div id="sentence-display"><span class="cursor"></span></div>
+        <div id="sentence-stats"></div>
+    </div>
     <input type="text" id="swipe" placeholder="Type a swipe pattern..." disabled>
     <div id="status">Loading...</div>
     <div id="results"></div>
-
     <div id="keyboard-container">
         <div id="keyboard"></div>
         <canvas id="path-canvas"></canvas>
     </div>
-
     <div id="explanation">
         <p>Swipe typing lets you draw a path across the keyboard instead of tapping individual keys. This predictor matches your input pattern against a word list.</p>
         <p>Each word is converted to a path on a QWERTY keyboard layout. The algorithm uses <a href="https://en.wikipedia.org/wiki/Dynamic_time_warping">Dynamic Time Warping (DTW)</a> to measure how similar your swipe path is to each word's path. Words with similar paths get low scores.</p>
@@ -97,7 +61,6 @@
             <li><em>asdfghjkl;poiuygfdsascsa</em> → alpaca</li>
             <li><em>poiuytrernmngyuijnb</em> → penguin</li>
         </ul>
-
         <h2>Optimizations</h2>
         <p>To run DTW (an O(n×m) algorithm) against 333k words in milliseconds entirely client-side, we needed some optimizations. The engine is written in Rust and compiled to WebAssembly:</p>
         <ul>
@@ -106,22 +69,17 @@
             <li><strong>O(n) space</strong> — keep only two rows of the DTW matrix in memory</li>
             <li><strong>First/last character filtering</strong> — only consider words matching the first character; penalize last character mismatches</li>
         </ul>
-
         <p><a href="https://github.com/ZimengXiong/swipePredictor">Source</a></p>
     </div>
-
     <script type="module">
         import init, { init_dictionary, predict_wasm } from './swipe_predictor_rs.js';
-
         const DICT_URL = "https://raw.githubusercontent.com/ZimengXiong/swipePredictor/refs/heads/master/word_freq.txt";
-
         const input = document.getElementById('swipe');
         const status = document.getElementById('status');
         const results = document.getElementById('results');
         const keyboard = document.getElementById('keyboard');
         const canvas = document.getElementById('path-canvas');
         const ctx = canvas.getContext('2d');
-
         const KEYBOARD_LAYOUT = {
             'q': [0, 0], 'w': [1, 0], 'e': [2, 0], 'r': [3, 0], 't': [4, 0],
             'y': [5, 0], 'u': [6, 0], 'i': [7, 0], 'o': [8, 0], 'p': [9, 0],
@@ -133,9 +91,7 @@
             'n': [6, 2], 'm': [7, 2], ',': [8, 2], '.': [9, 2], '/': [10, 2]
         };
         const KEY_SCALE = 7.5;
-
         const keyElements = {};
-
         function renderKeyboard() {
             keyboard.innerHTML = '';
             for (const [char, [x, y]] of Object.entries(KEYBOARD_LAYOUT)) {
@@ -149,323 +105,258 @@
                 keyElements[char] = key;
             }
         }
-
         let highlightTimeout = null;
         function highlightKey(char) {
             if (!char) return;
             const key = keyElements[char.toLowerCase()];
             if (!key) return;
-
             document.querySelectorAll('.key.active').forEach(k => k.classList.remove('active'));
             if (highlightTimeout) clearTimeout(highlightTimeout);
-
             key.classList.add('active');
-            highlightTimeout = setTimeout(() => {
-                key.classList.remove('active');
-            }, 200);
+            highlightTimeout = setTimeout(() => key.classList.remove('active'), 200);
         }
-
         function getSwipePath(swipe) {
             const path = [];
             for (const char of swipe.toLowerCase()) {
-                if (KEYBOARD_LAYOUT[char]) {
-                    path.push(KEYBOARD_LAYOUT[char]);
-                }
+                if (KEYBOARD_LAYOUT[char]) path.push(KEYBOARD_LAYOUT[char]);
             }
             return path;
         }
-
-        let animationId = null;
-        let currentPath = [];
-        let currentChars = [];
-        let keyTimestamps = [];
-        let trailPoints = [];
-        let lastHighlightedSegment = -1;
+        let animationId = null, currentPath = [], currentChars = [], keyTimestamps = [], trailPoints = [], lastHighlightedSegment = -1;
         const TRAIL_LENGTH = 50;
-
         function stopAnimation() {
-            if (animationId) {
-                cancelAnimationFrame(animationId);
-                animationId = null;
-            }
+            if (animationId) { cancelAnimationFrame(animationId); animationId = null; }
             trailPoints = [];
             lastHighlightedSegment = -1;
             document.querySelectorAll('.key.active').forEach(k => k.classList.remove('active'));
         }
-
         function drawStaticPath(swipe, timestamps) {
             stopAnimation();
-
             const rect = canvas.parentElement.getBoundingClientRect();
             canvas.width = rect.width * devicePixelRatio;
             canvas.height = rect.height * devicePixelRatio;
             ctx.scale(devicePixelRatio, devicePixelRatio);
             ctx.clearRect(0, 0, rect.width, rect.height);
-
             currentPath = getSwipePath(swipe);
             if (currentPath.length < 1) return;
-
-            keyTimestamps = [];
-            currentChars = [];
+            keyTimestamps = []; currentChars = [];
             for (let i = 0; i < swipe.length; i++) {
                 const char = swipe[i].toLowerCase();
-                if (KEYBOARD_LAYOUT[char]) {
-                    keyTimestamps.push(timestamps[i] || 0);
-                    currentChars.push(char);
-                }
+                if (KEYBOARD_LAYOUT[char]) { keyTimestamps.push(timestamps[i] || 0); currentChars.push(char); }
             }
-
-            const toPixel = ([x, y]) => [
-                (x * KEY_SCALE + 3.5) / 100 * rect.width,
-                (y * 33.33 + 15) / 100 * rect.height
-            ];
-
+            const toPixel = ([x, y]) => [(x * KEY_SCALE + 3.5) / 100 * rect.width, (y * 33.33 + 15) / 100 * rect.height];
             if (currentPath.length >= 2) {
-                ctx.beginPath();
-                ctx.strokeStyle = 'rgba(50, 100, 200, 0.4)';
-                ctx.lineWidth = 3;
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
-                const [startX, startY] = toPixel(currentPath[0]);
-                ctx.moveTo(startX, startY);
-                for (let i = 1; i < currentPath.length; i++) {
-                    const [x, y] = toPixel(currentPath[i]);
-                    ctx.lineTo(x, y);
-                }
+                ctx.beginPath(); ctx.strokeStyle = 'rgba(50, 100, 200, 0.4)'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+                const [startX, startY] = toPixel(currentPath[0]); ctx.moveTo(startX, startY);
+                for (let i = 1; i < currentPath.length; i++) { const [x, y] = toPixel(currentPath[i]); ctx.lineTo(x, y); }
                 ctx.stroke();
             }
-
             ctx.fillStyle = 'rgba(50, 100, 200, 0.6)';
-            for (const point of currentPath) {
-                const [x, y] = toPixel(point);
-                ctx.beginPath();
-                ctx.arc(x, y, 4, 0, Math.PI * 2);
-                ctx.fill();
-            }
+            for (const point of currentPath) { const [x, y] = toPixel(point); ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill(); }
         }
-
         function startAnimation() {
             if (currentPath.length < 2) return;
-
             const rect = canvas.parentElement.getBoundingClientRect();
-            trailPoints = [];
-            lastHighlightedSegment = -1;
+            trailPoints = []; lastHighlightedSegment = -1;
             animateLoop(rect);
         }
-
         function animateLoop(rect) {
-            const path = currentPath;
-            const timestamps = keyTimestamps;
+            const path = currentPath, timestamps = keyTimestamps;
             if (timestamps.length < 2) return;
-
             const totalDuration = timestamps[timestamps.length - 1] - timestamps[0];
             const startTime = performance.now();
-
-            const toPixel = ([x, y]) => [
-                (x * KEY_SCALE + 3.5) / 100 * rect.width,
-                (y * 33.33 + 15) / 100 * rect.height
-            ];
-
+            const toPixel = ([x, y]) => [(x * KEY_SCALE + 3.5) / 100 * rect.width, (y * 33.33 + 15) / 100 * rect.height];
             let prevElapsed = 0;
-
             function draw() {
                 ctx.clearRect(0, 0, rect.width, rect.height);
-
                 const loopDuration = totalDuration + 500;
                 const elapsed = (performance.now() - startTime) % loopDuration;
-
-                if (elapsed < prevElapsed) {
-                    trailPoints = [];
-                    lastHighlightedSegment = -1;
-                }
+                if (elapsed < prevElapsed) { trailPoints = []; lastHighlightedSegment = -1; }
                 prevElapsed = elapsed;
-
                 const currentTime = timestamps[0] + elapsed;
-
                 let segmentIdx = 0;
                 for (let i = 0; i < timestamps.length - 1; i++) {
-                    if (currentTime >= timestamps[i] && currentTime < timestamps[i + 1]) {
-                        segmentIdx = i;
-                        break;
-                    } else if (currentTime >= timestamps[timestamps.length - 1]) {
-                        segmentIdx = timestamps.length - 2;
-                    }
+                    if (currentTime >= timestamps[i] && currentTime < timestamps[i + 1]) { segmentIdx = i; break; }
+                    else if (currentTime >= timestamps[timestamps.length - 1]) { segmentIdx = timestamps.length - 2; }
                 }
-
-                const segStart = timestamps[segmentIdx];
-                const segEnd = timestamps[segmentIdx + 1];
+                const segStart = timestamps[segmentIdx], segEnd = timestamps[segmentIdx + 1];
                 const segmentProgress = Math.min(1, (currentTime - segStart) / (segEnd - segStart));
-
-                const [x1, y1] = toPixel(path[segmentIdx]);
-                const [x2, y2] = toPixel(path[segmentIdx + 1]);
-                const currX = x1 + (x2 - x1) * segmentProgress;
-                const currY = y1 + (y2 - y1) * segmentProgress;
-
-                if (segmentIdx !== lastHighlightedSegment) {
-                    lastHighlightedSegment = segmentIdx;
-                    highlightKey(currentChars[segmentIdx]);
-                }
-
+                const [x1, y1] = toPixel(path[segmentIdx]), [x2, y2] = toPixel(path[segmentIdx + 1]);
+                const currX = x1 + (x2 - x1) * segmentProgress, currY = y1 + (y2 - y1) * segmentProgress;
+                if (segmentIdx !== lastHighlightedSegment) { lastHighlightedSegment = segmentIdx; highlightKey(currentChars[segmentIdx]); }
                 trailPoints.push([currX, currY]);
-                if (trailPoints.length > TRAIL_LENGTH) {
-                    trailPoints.shift();
-                }
-
-                ctx.beginPath();
-                ctx.strokeStyle = 'rgba(50, 100, 200, 0.1)';
-                ctx.lineWidth = 3;
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
-                const [startX, startY] = toPixel(path[0]);
-                ctx.moveTo(startX, startY);
-                for (let i = 1; i < path.length; i++) {
-                    const [x, y] = toPixel(path[i]);
-                    ctx.lineTo(x, y);
-                }
+                if (trailPoints.length > TRAIL_LENGTH) trailPoints.shift();
+                ctx.beginPath(); ctx.strokeStyle = 'rgba(50, 100, 200, 0.1)'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+                const [startX, startY] = toPixel(path[0]); ctx.moveTo(startX, startY);
+                for (let i = 1; i < path.length; i++) { const [x, y] = toPixel(path[i]); ctx.lineTo(x, y); }
                 ctx.stroke();
-
                 for (let i = 1; i < trailPoints.length; i++) {
-                    const opacity = (i / trailPoints.length) * 0.5;
-                    const width = (i / trailPoints.length) * 4 + 1;
-                    ctx.beginPath();
-                    ctx.strokeStyle = `rgba(50, 100, 200, ${opacity})`;
-                    ctx.lineWidth = width;
-                    ctx.lineCap = 'round';
-                    ctx.moveTo(trailPoints[i - 1][0], trailPoints[i - 1][1]);
-                    ctx.lineTo(trailPoints[i][0], trailPoints[i][1]);
-                    ctx.stroke();
+                    const opacity = (i / trailPoints.length) * 0.5, width = (i / trailPoints.length) * 4 + 1;
+                    ctx.beginPath(); ctx.strokeStyle = `rgba(50, 100, 200, ${opacity})`; ctx.lineWidth = width; ctx.lineCap = 'round';
+                    ctx.moveTo(trailPoints[i - 1][0], trailPoints[i - 1][1]); ctx.lineTo(trailPoints[i][0], trailPoints[i][1]); ctx.stroke();
                 }
-
-                ctx.beginPath();
-                ctx.fillStyle = 'rgba(50, 100, 200, 0.9)';
-                ctx.arc(currX, currY, 6, 0, Math.PI * 2);
-                ctx.fill();
-
+                ctx.beginPath(); ctx.fillStyle = 'rgba(50, 100, 200, 0.9)'; ctx.arc(currX, currY, 6, 0, Math.PI * 2); ctx.fill();
                 animationId = requestAnimationFrame(draw);
             }
-
             draw();
         }
-
         renderKeyboard();
-
         async function main() {
             status.textContent = 'Loading WASM...';
             await init();
-
             status.textContent = 'Fetching dictionary...';
             const res = await fetch(DICT_URL);
             const freqText = await res.text();
-
             status.textContent = 'Initializing...';
             init_dictionary(freqText);
-
             status.innerHTML = '<span>Ready</span><span class="typing-stats"></span>';
             input.disabled = false;
             input.focus();
-
-            let pendingTimer = null;
-            let pendingRaf = null;
-            let predictionId = 0;
-            const DEBOUNCE_THRESHOLD = 15;
-            const DEBOUNCE_DELAY = 300;
-
-            let charTimestamps = [];
-            let lastInputLength = 0;
-
+            const modeWordBtn = document.getElementById('mode-word');
+            const modeSentenceBtn = document.getElementById('mode-sentence');
+            const sentenceContainer = document.getElementById('sentence-container');
+            const sentenceDisplay = document.getElementById('sentence-display');
+            const sentenceStats = document.getElementById('sentence-stats');
+            let pendingTimer = null, pendingRaf = null, predictionId = 0;
+            const DEBOUNCE_THRESHOLD = 15, DEBOUNCE_DELAY = 200;
+            let charTimestamps = [], lastInputLength = 0;
+            let mode = 'word', sentenceState = 'idle', sentenceWords = [], wordHistory = [], awaitingPredictions = [], currentWordStartTime = null;
             function cancelPending() {
-                if (pendingTimer) {
-                    clearTimeout(pendingTimer);
-                    pendingTimer = null;
-                }
-                if (pendingRaf) {
-                    cancelAnimationFrame(pendingRaf);
-                    pendingRaf = null;
-                }
+                if (pendingTimer) { clearTimeout(pendingTimer); pendingTimer = null; }
+                if (pendingRaf) { cancelAnimationFrame(pendingRaf); pendingRaf = null; }
                 predictionId++;
             }
-
+            function renderPredictions(predictions, showBadges = false) {
+                results.innerHTML = `<div class="prediction" style="font-weight:bold;opacity:0.6">
+                    <span class="word">Word</span><span class="score">Score</span><span class="popularity">Popularity</span>
+                </div>` + predictions.map((p, i) => `<div class="prediction"><span class="word">${showBadges ? `[${i + 1}] ` : ''}${p.word}</span><span class="score">${p.score.toFixed(3)}</span><span class="popularity">${p.freq.toFixed(3)}</span></div>`).join('');
+            }
+            function updateSentenceDisplay() {
+                sentenceDisplay.innerHTML = (sentenceWords.length > 0 ? sentenceWords.join(' ') + ' ' : '') + '<span class="cursor"></span>';
+            }
+            function updateSentenceStats() {
+                if (wordHistory.length === 0) { sentenceStats.textContent = ''; return; }
+                const totalDuration = wordHistory.reduce((s, w) => s + w.duration, 0);
+                const totalCharsTyped = wordHistory.reduce((s, w) => s + w.charsTyped, 0);
+                const totalCharsSelected = wordHistory.reduce((s, w) => s + w.charsSelected, 0);
+                const minutes = totalDuration / 60000;
+                const physicalWpm = minutes > 0 ? Math.round((totalCharsTyped / 5) / minutes) : 0;
+                const actualWpm = minutes > 0 ? Math.round((totalCharsSelected / 5) / minutes) : 0;
+                sentenceStats.textContent = `${sentenceWords.length} words · ${totalCharsTyped}/${totalCharsSelected} chars · ${physicalWpm} physical / ${actualWpm} actual WPM`;
+            }
+            function clearCanvas() {
+                const rect = canvas.parentElement.getBoundingClientRect();
+                canvas.width = rect.width * devicePixelRatio;
+                canvas.height = rect.height * devicePixelRatio;
+                ctx.scale(devicePixelRatio, devicePixelRatio);
+                ctx.clearRect(0, 0, rect.width, rect.height);
+            }
+            function selectPrediction(index) {
+                if (index >= awaitingPredictions.length) return;
+                const prediction = awaitingPredictions[index];
+                const swipeLength = input.value.trim().length;
+                const duration = performance.now() - currentWordStartTime;
+                wordHistory.push({ word: prediction.word, charsTyped: swipeLength, charsSelected: prediction.word.length, duration });
+                sentenceWords.push(prediction.word);
+                input.value = ''; charTimestamps = []; lastInputLength = 0;
+                sentenceState = 'idle'; awaitingPredictions = []; currentWordStartTime = null;
+                results.innerHTML = '';
+                stopAnimation(); clearCanvas();
+                updateSentenceDisplay(); updateSentenceStats();
+                status.innerHTML = '<span>Ready for next word</span><span class="typing-stats"></span>';
+            }
+            function undoLastWord() {
+                if (wordHistory.length === 0) return;
+                wordHistory.pop(); sentenceWords.pop();
+                sentenceState = 'idle'; awaitingPredictions = [];
+                results.innerHTML = '';
+                updateSentenceDisplay(); updateSentenceStats();
+                status.innerHTML = '<span>Word removed</span><span class="typing-stats"></span>';
+            }
+            function setMode(newMode) {
+                mode = newMode;
+                modeWordBtn.classList.toggle('active', mode === 'word');
+                modeSentenceBtn.classList.toggle('active', mode === 'sentence');
+                sentenceContainer.classList.toggle('visible', mode === 'sentence');
+                input.value = ''; charTimestamps = []; lastInputLength = 0;
+                sentenceState = 'idle'; sentenceWords = []; wordHistory = []; awaitingPredictions = []; currentWordStartTime = null;
+                results.innerHTML = '';
+                stopAnimation(); clearCanvas();
+                updateSentenceDisplay(); updateSentenceStats();
+                status.innerHTML = '<span>Ready</span><span class="typing-stats"></span>';
+                input.focus();
+            }
+            modeWordBtn.addEventListener('click', () => setMode('word'));
+            modeSentenceBtn.addEventListener('click', () => setMode('sentence'));
             function runPrediction(id) {
                 if (id !== predictionId) return;
                 const swipe = input.value.trim().toLowerCase();
-                if (!swipe) {
-                    results.innerHTML = '';
-                    status.innerHTML = '<span>Ready</span><span class="typing-stats"></span>';
-                    return;
-                }
+                if (!swipe) { results.innerHTML = ''; status.innerHTML = '<span>Ready</span><span class="typing-stats"></span>'; return; }
                 const start = performance.now();
                 const json = predict_wasm(swipe, 5);
                 const elapsed = ((performance.now() - start) / 1000).toFixed(3);
-
                 const predictions = JSON.parse(json);
-
-                let typingStats = '';
-                if (charTimestamps.length >= 2) {
-                    const typingTimeMs = charTimestamps[charTimestamps.length - 1] - charTimestamps[0];
-                    const typingTimeSec = (typingTimeMs / 1000).toFixed(2);
-                    const minutes = typingTimeMs / 60000;
-                    const physicalWpm = minutes > 0 ? Math.round((swipe.length / 5) / minutes) : 0;
-                    const firstWord = predictions.length > 0 ? predictions[0].word : '';
-                    const actualWpm = minutes > 0 && firstWord ? Math.round((firstWord.length / 5) / minutes) : 0;
-                    typingStats = `typed in ${typingTimeSec}s · ${physicalWpm} Physical · ${actualWpm} Actual WPM`;
+                if (mode === 'sentence') {
+                    awaitingPredictions = predictions; sentenceState = 'awaiting';
+                    renderPredictions(predictions, true);
+                    status.innerHTML = '<span>Press 1-5 to select, or start next word</span><span class="typing-stats"></span>';
+                } else {
+                    let typingStats = '';
+                    if (charTimestamps.length >= 2) {
+                        const typingTimeMs = charTimestamps[charTimestamps.length - 1] - charTimestamps[0];
+                        const typingTimeSec = (typingTimeMs / 1000).toFixed(2);
+                        const minutes = typingTimeMs / 60000;
+                        const physicalWpm = minutes > 0 ? Math.round((swipe.length / 5) / minutes) : 0;
+                        const firstWord = predictions.length > 0 ? predictions[0].word : '';
+                        const actualWpm = minutes > 0 && firstWord ? Math.round((firstWord.length / 5) / minutes) : 0;
+                        typingStats = `typed in ${typingTimeSec}s · ${physicalWpm} Physical · ${actualWpm} Actual WPM`;
+                    }
+                    status.innerHTML = `<span>Computed in ${elapsed}s</span><span class="typing-stats">${typingStats}</span>`;
+                    renderPredictions(predictions, false);
                 }
-
-                status.innerHTML = `<span>Computed in ${elapsed}s</span><span class="typing-stats">${typingStats}</span>`;
-                results.innerHTML = `<div class="prediction" style="font-weight:bold;opacity:0.6">
-                        <span class="word">Word</span>
-                        <span class="score">Score</span>
-                        <span class="popularity">Popularity</span>
-                    </div>` + predictions.map(p =>
-                    `<div class="prediction">
-                        <span class="word">${p.word}</span>
-                        <span class="score">${p.score.toFixed(3)}</span>
-                        <span class="popularity">${p.freq.toFixed(3)}</span>
-                    </div>`
-                ).join('');
             }
-
+            input.addEventListener('keydown', (e) => {
+                if (mode !== 'sentence') return;
+                if ((sentenceState === 'awaiting' || sentenceState === 'typing') && e.key >= '1' && e.key <= '5' && awaitingPredictions.length > 0) {
+                    e.preventDefault();
+                    const index = parseInt(e.key) - 1;
+                    if (index < awaitingPredictions.length) selectPrediction(index);
+                    return;
+                }
+                if (e.key === 'Backspace' && input.value === '' && wordHistory.length > 0) {
+                    e.preventDefault(); undoLastWord(); return;
+                }
+                if (sentenceState === 'awaiting' && /^[a-z]$/i.test(e.key) && awaitingPredictions.length > 0) {
+                    selectPrediction(0);
+                }
+            });
             input.addEventListener('input', () => {
                 const swipe = input.value.trim();
                 const now = performance.now();
                 cancelPending();
                 const id = predictionId;
-
                 const currentLength = swipe.length;
-                if (currentLength > lastInputLength) {
-                    for (let i = lastInputLength; i < currentLength; i++) {
-                        charTimestamps.push(now);
-                    }
-                } else if (currentLength < lastInputLength) {
-                    charTimestamps = charTimestamps.slice(0, currentLength);
-                }
+                if (currentLength > lastInputLength) { for (let i = lastInputLength; i < currentLength; i++) charTimestamps.push(now); }
+                else if (currentLength < lastInputLength) { charTimestamps = charTimestamps.slice(0, currentLength); }
                 lastInputLength = currentLength;
-
+                if (mode === 'sentence' && sentenceState === 'idle' && swipe.length > 0) {
+                    sentenceState = 'typing'; currentWordStartTime = now;
+                }
                 drawStaticPath(swipe, [...charTimestamps]);
                 highlightKey(swipe[swipe.length - 1]);
-
                 if (!swipe) {
-                    charTimestamps = [];
-                    lastInputLength = 0;
-                    results.innerHTML = '';
-                    status.innerHTML = '<span>Ready</span><span class="typing-stats"></span>';
-                    return;
+                    charTimestamps = []; lastInputLength = 0;
+                    if (mode === 'sentence') { sentenceState = 'idle'; awaitingPredictions = []; }
+                    results.innerHTML = ''; status.innerHTML = '<span>Ready</span><span class="typing-stats"></span>'; return;
                 }
-
-                pendingTimer = setTimeout(() => {
-                    runPrediction(id);
-                    startAnimation();
-                }, swipe.length < DEBOUNCE_THRESHOLD ? 100 : DEBOUNCE_DELAY);
-
-                if (swipe.length >= DEBOUNCE_THRESHOLD) {
-                    status.innerHTML = '<span>Typing...</span><span class="typing-stats"></span>';
-                }
+                if (mode === 'sentence' && sentenceState === 'awaiting') { sentenceState = 'typing'; }
+                const debounceDelay = mode === 'sentence' ? DEBOUNCE_DELAY : (swipe.length < DEBOUNCE_THRESHOLD ? 100 : DEBOUNCE_DELAY);
+                pendingTimer = setTimeout(() => { runPrediction(id); startAnimation(); }, debounceDelay);
+                if (mode === 'word' && swipe.length >= DEBOUNCE_THRESHOLD) { status.innerHTML = '<span>Typing...</span><span class="typing-stats"></span>'; }
+                else if (mode === 'sentence') { status.innerHTML = '<span>Typing...</span><span class="typing-stats"></span>'; }
             });
         }
-
-        main().catch(err => {
-            status.textContent = 'Error: ' + err.message;
-            console.error(err);
-        });
+        main().catch(err => { status.textContent = 'Error: ' + err.message; console.error(err); });
     </script>
 </body>
 </html>

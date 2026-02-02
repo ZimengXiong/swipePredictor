@@ -24,9 +24,9 @@ struct Args {
     #[arg(short, long, default_value = "word_freq.txt")]
     freq: PathBuf,
 
-    /// score margin within which frequency is used as tiebreaker
-    #[arg(long, default_value_t = 0.1)]
-    margin: f64,
+    /// popularity weight factor (higher = more influence from word frequency)
+    #[arg(long, default_value_t = 1.0)]
+    pop_weight: f64,
 }
 
 fn load_words(path: &PathBuf) -> Result<Vec<String>> {
@@ -81,7 +81,7 @@ fn load_frequencies(path: &PathBuf) -> Result<HashMap<String, f64>> {
     Ok(freq_map)
 }
 
-fn predict(swipe_input: &str, words: &[String], freq: &HashMap<String, f64>, limit: usize, margin: f64) {
+fn predict(swipe_input: &str, words: &[String], freq: &HashMap<String, f64>, limit: usize, pop_weight: f64) {
     let layout = get_keyboard_layout();
     let raw_input_path = get_word_path(swipe_input, &layout);
 
@@ -161,11 +161,11 @@ fn predict(swipe_input: &str, words: &[String], freq: &HashMap<String, f64>, lim
         })
         .collect();
 
-    // Sort by combined score: DTW score - (frequency * margin)
-    // This makes frequency a tiebreaker within similar DTW scores
+    // Sort by combined score: DTW score * (1 - popularity * weight)
+    // This makes popularity influence scale proportionally with score differences
     candidates.sort_by(|a, b| {
-        let combined_a = a.1 - (a.2 * margin);
-        let combined_b = b.1 - (b.2 * margin);
+        let combined_a = a.1 * (1.0 - a.2 * pop_weight).max(0.1);
+        let combined_b = b.1 * (1.0 - b.2 * pop_weight).max(0.1);
         combined_a.partial_cmp(&combined_b).unwrap_or(std::cmp::Ordering::Equal)
     });
 
@@ -198,7 +198,7 @@ fn main() -> Result<()> {
     println!("{}", format!("Loaded {} words, {} with frequency data", words.len(), freq.len()).dimmed());
 
     if let Some(swipe) = args.swipe {
-        predict(&swipe, &words, &freq, args.limit, args.margin);
+        predict(&swipe, &words, &freq, args.limit, args.pop_weight);
     } else {
         println!("{}", "Starting Interactive Mode. Type 'exit' or 'quit' to stop.".yellow().bold());
         loop {
@@ -216,7 +216,7 @@ fn main() -> Result<()> {
                 continue;
             }
 
-            predict(&input, &words, &freq, args.limit, args.margin);
+            predict(&input, &words, &freq, args.limit, args.pop_weight);
         }
     }
 
