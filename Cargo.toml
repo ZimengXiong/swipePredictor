@@ -1,16 +1,17 @@
-[package]
-name = "swipe-predictor-rs"
+[workspace]
+resolver = "2"
+members = [
+    "crates/swipe-engine",
+    "apps/web",
+]
+
+[workspace.package]
 version = "0.1.0"
 edition = "2021"
+authors = ["Zimeng Xiong"]
+license = "MIT"
 
-[lib]
-crate-type = ["cdylib", "rlib"]
-
-[dependencies]
-anyhow = "1.0.100"
-clap = { version = "4.5.56", features = ["derive"] }
-colored = "3.1.1"
-rayon = "1.11.0"
-wasm-bindgen = "0.2"
+[workspace.dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+wasm-bindgen = "0.2"

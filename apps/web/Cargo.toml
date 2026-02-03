@@ -1,0 +1,11 @@
+[package]
+name = "swipe-web"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+swipe-engine = { path = "../../crates/swipe-engine", features = ["wasm"] }
+wasm-bindgen = { workspace = true }
