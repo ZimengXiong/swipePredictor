@@ -16,22 +16,56 @@ brew install zimengxiong/tools/swipetype
 
 ## Building
 
-### Web
+<details>
+<summary>Rust Engine</summary>
 
 ```bash
-make build-website
-make serve
+cd crates/swipe-engine
+
+# Build native library
+cargo build
+
+# Build WASM for web
+cargo build --features wasm
+
+# Build staticlib for macOS
+cargo build --release --features ffi
 ```
 
-### macOS App
+```rust
+use swipe_engine::{SwipeEngine, Point};
+
+let mut engine = SwipeEngine::new();
+engine.load_dictionary("hello\t1000\nworld\t500\n");
+
+let predictions = engine.predict("hello", 5);
+// Returns: [(word: String, score: f64, freq: f64), ...]
+```
+
+</details>
+
+<details>
+<summary>Web</summary>
 
 ```bash
-make dmg-mac
-make run
+make web-build
+make web-serve
+```
+
+</details>
+
+<details>
+<summary>macOS App</summary>
+
+```bash
+make mac-dmg
 # Creates `apps/mac/build/SwipeType.dmg`
+make mac-run
 ```
 
-#### Screenshots
+</details>
+
+## Screenshots
 
 | Main                          | Help                          |
 | ----------------------------- | ----------------------------- |

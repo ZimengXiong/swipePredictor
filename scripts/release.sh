@@ -100,7 +100,7 @@ fi
 
 echo "Starting Build & Package Process..."
 cd "$ROOT_DIR"
-make dmg-mac
+make mac-dmg
 
 FINAL_BUILD=$(cat "$BUILD_NUMBER_FILE" | tr -d '[:space:]')
 TAG_NAME="v$NEW_VERSION"

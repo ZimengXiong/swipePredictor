@@ -1,4 +1,4 @@
-.PHONY: build-website serve build-mac dmg-mac mac-run release clean sync-version bump-build
+.PHONY: web-build web-serve mac-build mac-dmg mac-run mac-install mac-xcode rust-build version-sync version-bump release clean
 
 # Paths
 VERSION_FILE := VERSION
@@ -8,21 +8,21 @@ RUST_SRC := crates/swipe-engine
 RUST_TARGET := aarch64-apple-darwin
 RUST_LIB_NAME := libswipe_engine.a
 
-# --- Website ---
-build-website:
+# --- Web ---
+web-build:
 	cd apps/web && wasm-pack build --target web
 	mkdir -p build
 	cp apps/web/pkg/swipe_web.js apps/web/pkg/swipe_web_bg.wasm build/
 	cp apps/web/www/index.html build/
 
-serve: build-website
+web-serve: web-build
 	cd build && python3 -m http.server 8000
 
 # --- Versioning ---
-sync-version:
+version-sync:
 	./scripts/sync_version.sh
 
-bump-build:
+version-bump:
 	@if [ -f $(BUILD_NUMBER_FILE) ]; then \
 		BUILD=$$(cat $(BUILD_NUMBER_FILE) | tr -d '[:space:]'); \
 		NEW_BUILD=$$(($$BUILD + 1)); \
@@ -33,16 +33,17 @@ bump-build:
 		echo "Created BUILD_NUMBER file with 1"; \
 	fi
 
-# --- Mac App ---
-rust-release-mac:
+# --- Rust ---
+rust-build:
 	cd $(RUST_SRC) && cargo build --release --features ffi --target $(RUST_TARGET)
 	mkdir -p $(MAC_APP_DIR)/Rust
 	cp target/$(RUST_TARGET)/release/$(RUST_LIB_NAME) $(MAC_APP_DIR)/Rust/$(RUST_LIB_NAME)
 
-xcode-project: sync-version
+# --- Mac ---
+mac-xcode: version-sync
 	cd $(MAC_APP_DIR) && xcodegen generate
 
-build-mac: bump-build xcode-project rust-release-mac
+mac-build: version-bump mac-xcode rust-build
 	cd $(MAC_APP_DIR) && xcodebuild -project SwipeTypeMac.xcodeproj -scheme SwipeTypeMac -configuration Release -derivedDataPath BuildData build
 	mkdir -p $(MAC_APP_DIR)/build/Release
 	cp -R $(MAC_APP_DIR)/BuildData/Build/Products/Release/SwipeType.app $(MAC_APP_DIR)/build/Release/
@@ -50,7 +51,10 @@ build-mac: bump-build xcode-project rust-release-mac
 mac-run:
 	./$(MAC_APP_DIR)/build/Release/SwipeType.app/Contents/MacOS/SwipeType
 
-dmg-mac: build-mac
+mac-install: mac-build
+	cp -r $(MAC_APP_DIR)/build/Release/SwipeType.app /Applications/
+
+mac-dmg: mac-build
 	@echo "Packaging into DMG..."
 	mkdir -p $(MAC_APP_DIR)/build/dmg
 	rm -rf $(MAC_APP_DIR)/build/dmg/*
@@ -59,7 +63,7 @@ dmg-mac: build-mac
 	hdiutil create -volname "SwipeType" -srcfolder $(MAC_APP_DIR)/build/dmg -ov -format UDZO $(MAC_APP_DIR)/build/SwipeType.dmg
 	@echo "Created $(MAC_APP_DIR)/build/SwipeType.dmg"
 
-# --- Release Pipeline ---
+# --- Release ---
 release:
 	@./scripts/release.sh
 
