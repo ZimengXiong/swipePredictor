@@ -1,12 +1,53 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 # Setup paths
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 ROOT_DIR="$( cd "$SCRIPT_DIR/.." && pwd )"
 VERSION_FILE="$ROOT_DIR/VERSION"
 BUILD_NUMBER_FILE="$ROOT_DIR/BUILD_NUMBER"
-CASK_FILE="$ROOT_DIR/homebrew/Casks/swipetype.rb"
+HB_REPO_DIR="$ROOT_DIR/homebrew"
+HB_CASK_REL_PATH="Casks/swipetype.rb"
+CASK_FILE="$HB_REPO_DIR/$HB_CASK_REL_PATH"
+
+ensure_homebrew_repo() {
+    if [ ! -d "$HB_REPO_DIR" ]; then
+        echo "Homebrew tap repo not found at $HB_REPO_DIR"
+        echo "Initializing submodule..."
+        git -C "$ROOT_DIR" submodule update --init --recursive homebrew
+    fi
+
+    if ! git -C "$HB_REPO_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        echo "Error: $HB_REPO_DIR is not a git repo. Expected the homebrew-tools submodule checkout."
+        echo "Fix: git submodule update --init --recursive homebrew"
+        exit 1
+    fi
+
+    HB_URL="$(git -C "$ROOT_DIR" config -f .gitmodules --get submodule.homebrew.url 2>/dev/null || true)"
+    if [ -n "$HB_URL" ]; then
+        git -C "$HB_REPO_DIR" remote set-url origin "$HB_URL" >/dev/null 2>&1 || true
+    fi
+
+    git -C "$HB_REPO_DIR" fetch origin --prune
+
+    HB_DEFAULT_BRANCH="$(git -C "$HB_REPO_DIR" symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null || true)"
+    HB_DEFAULT_BRANCH="${HB_DEFAULT_BRANCH#origin/}"
+    if [ -z "$HB_DEFAULT_BRANCH" ]; then
+        HB_DEFAULT_BRANCH="main"
+    fi
+
+    if [ "$(git -C "$HB_REPO_DIR" branch --show-current)" != "$HB_DEFAULT_BRANCH" ]; then
+        if git -C "$HB_REPO_DIR" show-ref --verify --quiet "refs/heads/$HB_DEFAULT_BRANCH"; then
+            git -C "$HB_REPO_DIR" checkout "$HB_DEFAULT_BRANCH"
+        else
+            git -C "$HB_REPO_DIR" checkout -b "$HB_DEFAULT_BRANCH" "origin/$HB_DEFAULT_BRANCH"
+        fi
+    fi
+
+    git -C "$HB_REPO_DIR" pull --ff-only origin "$HB_DEFAULT_BRANCH"
+}
+
+cd "$ROOT_DIR"
 
 # Check for uncommitted changes (excluding version files which we might change)
 if ! git diff-index --quiet HEAD --; then
@@ -78,7 +119,11 @@ fi
 
 # Calculate SHA256 for Homebrew
 echo "SHASUMing DMG..."
-SHA256=$(shasum -a 256 "$DMG_PATH" | awk '{print $1}')
+SHA256=$(shasum -a 256 "$DMG_PATH" | awk '{print $1}' | tr '[:upper:]' '[:lower:]')
+if [[ ! "$SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+    echo "Error: Failed to calculate SHA256 for $DMG_PATH"
+    exit 1
+fi
 echo "SHA256: $SHA256"
 
 echo "Build Complete."
@@ -94,13 +139,44 @@ fi
 
 # 1. Update Homebrew Cask
 echo "Updating Homebrew Cask..."
-if [ -f "$CASK_FILE" ]; then
-    sed -i '' "s/version \".*\"/version \"$NEW_VERSION\"/" "$CASK_FILE"
-    sed -i '' "s/sha256 \".*\"/sha256 \"$SHA256\"/" "$CASK_FILE"
-    echo "Updated $CASK_FILE"
+ensure_homebrew_repo
+
+mkdir -p "$(dirname "$CASK_FILE")"
+if [ ! -f "$CASK_FILE" ]; then
+    cat >"$CASK_FILE" <<EOF
+cask "swipetype" do
+  version "$NEW_VERSION"
+  sha256 "$SHA256"
+
+  url "https://github.com/ZimengXiong/swipeType/releases/download/v#{version}/SwipeType.dmg"
+  name "SwipeType"
+  desc "Swipe-to-type predictor for macOS"
+  homepage "https://github.com/ZimengXiong/swipeType"
+
+  depends_on macos: ">= :ventura"
+
+  app "SwipeType.app"
+
+  zap trash: [
+    "~/Library/Preferences/com.swipetype.SwipeType.plist",
+    "~/Library/Saved Application State/com.swipetype.SwipeType.savedState"
+  ]
+end
+EOF
 else
-    echo "Warning: Cask file not found at $CASK_FILE"
+    sed -i '' "s/^[[:space:]]*version .*/  version \"$NEW_VERSION\"/" "$CASK_FILE"
+    sed -i '' "s/^[[:space:]]*sha256 .*/  sha256 \"$SHA256\"/" "$CASK_FILE"
 fi
+
+if ! grep -q "version \"$NEW_VERSION\"" "$CASK_FILE"; then
+    echo "Error: Failed to update version in $CASK_FILE"
+    exit 1
+fi
+if ! grep -q "sha256 \"$SHA256\"" "$CASK_FILE"; then
+    echo "Error: Failed to update sha256 in $CASK_FILE"
+    exit 1
+fi
+echo "Updated $CASK_FILE"
 
 # Detect current branch
 CURRENT_BRANCH=$(git branch --show-current)
@@ -123,11 +199,10 @@ gh release create "$TAG_NAME" "$DMG_PATH" --title "$RELEASE_TITLE" --notes "Auto
 
 # 4. Homebrew Repo Git Operations
 echo "Committing Homebrew repo changes..."
-cd "$ROOT_DIR/homebrew"
-HB_BRANCH=$(git branch --show-current)
-git add "Casks/swipetype.rb"
+cd "$HB_REPO_DIR"
+git add "$HB_CASK_REL_PATH"
 git commit -m "swipetype $NEW_VERSION" || echo "No changes to commit in homebrew repo"
-echo "Pushing Homebrew repo to GitHub ($HB_BRANCH)..."
-git push origin "$HB_BRANCH"
+echo "Pushing Homebrew repo to GitHub ($HB_DEFAULT_BRANCH)..."
+git push origin "$HB_DEFAULT_BRANCH"
 
 echo "All done! Release $TAG_NAME is live and Homebrew cask is updated."
