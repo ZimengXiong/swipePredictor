@@ -11,13 +11,13 @@ enum OverlayLayout {
     static let panelWidth: CGFloat = 388
     static let horizontalPadding: CGFloat = 16
     static let verticalPaddingTop: CGFloat = 12
-    static let verticalPaddingBottom: CGFloat = 4
-    static let sectionSpacing: CGFloat = 4
+    static let verticalPaddingBottom: CGFloat = 6
+    static let sectionSpacing: CGFloat = 0
     static let predictionCount = 5
     static let predictionRowHeight: CGFloat = 28
-    static let predictionRowSpacing: CGFloat = 5
+    static let predictionRowSpacing: CGFloat = 4
     static let statsHeight: CGFloat = 16
-    static let keyboardHeight: CGFloat = 96
+    static let keyboardHeight: CGFloat = 100
     static let footerHeight: CGFloat = 14
     static let containerCornerRadius: CGFloat = 14
     static let rowCornerRadius: CGFloat = 8
@@ -36,7 +36,6 @@ enum OverlayLayout {
             + statsHeight
             + keyboardHeight
             + footerHeight
-            + sectionSpacing * 3
     }
 
     static var panelSize: CGSize {
@@ -47,6 +46,7 @@ enum OverlayLayout {
 struct ContentView: View {
     @ObservedObject private var appState = AppState.shared
     @AppStorage(AppSettings.Keys.overlayBackgroundOpacity) private var backgroundOverlayOpacity = AppSettings.Defaults.overlayBackgroundOpacity
+    @AppStorage(AppSettings.Keys.useTransparency) private var useTransparency = AppSettings.Defaults.useTransparency
     @State private var isShowingHelp = false
 
     private var backgroundOpacity: Double {
@@ -115,8 +115,15 @@ struct ContentView: View {
         .padding(.bottom, OverlayLayout.verticalPaddingBottom)
         .frame(width: OverlayLayout.panelSize.width, height: OverlayLayout.panelSize.height)
         .background(
-            VisualEffectView(material: .hudWindow, blendingMode: .withinWindow, emphasized: false)
-                .overlay(Color.black.opacity(backgroundOpacity))
+            ZStack {
+                if useTransparency {
+                    VisualEffectView(material: .hudWindow, blendingMode: .withinWindow, emphasized: false)
+                    Color.black.opacity(backgroundOpacity)
+                } else {
+                    // Opaque background: black with white component inversely proportional to dimming
+                    Color(white: 0.25 * (1.0 - backgroundOverlayOpacity / 0.9))
+                }
+            }
         )
         .clipShape(RoundedRectangle(cornerRadius: OverlayLayout.containerCornerRadius))
         .overlay {
@@ -359,10 +366,10 @@ struct KeyboardView: View {
         ("N", 6.5, 2), ("M", 7.5, 2), (",", 8.5, 2), (".", 9.5, 2), ("/", 10.5, 2)
     ]
 
-    private let idleLoopPadding: TimeInterval = 0.5
+    private let idleLoopPadding: TimeInterval = 0.4
     private let sloppinessVariants = 5
-    private let sloppinessAmplitude: CGFloat = 1.0
-    private let animationSloppinessAmplitude: CGFloat = 1.5
+    private let sloppinessAmplitude: CGFloat = 3.5
+    private let animationSloppinessAmplitude: CGFloat = 4.5
 
     @State private var animationBaseTime: TimeInterval = 0
 
@@ -376,10 +383,13 @@ struct KeyboardView: View {
                 Canvas { context, _ in
                     let totalCols: CGFloat = 13
                     let gap: CGFloat = 2
-                    let minPadding: CGFloat = OverlayLayout.keyboardSidePadding
+                    let minPadding: CGFloat = 6
                     let availableWidth = max(0, proxy.size.width - minPadding * 2 - gap * (totalCols - 1))
-                    let keyW = max(16, min(24, availableWidth / totalCols))
-                    let keyH = keyW * 0.7
+                    
+                    // Dynamically calculate key size to fill height
+                    let maxKeyH = (proxy.size.height - gap * 2) / 3
+                    let keyW = max(16, min(maxKeyH, availableWidth / totalCols))
+                    let keyH = keyW // Square keys
 
                     let keyboardWidth = totalCols * keyW + (totalCols - 1) * gap
                     let leftPad = (proxy.size.width - keyboardWidth) / 2

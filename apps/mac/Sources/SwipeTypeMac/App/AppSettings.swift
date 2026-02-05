@@ -20,6 +20,7 @@ enum AppSettings {
         static let requirePauseBeforeCommit = "requirePauseBeforeCommit"
         static let insertTrailingSpace = "insertTrailingSpace"
         static let overlayBackgroundOpacity = "overlayBackgroundOpacity"
+        static let useTransparency = "useTransparency"
         static let playSwipeAnimation = "playSwipeAnimation"
     }
 
@@ -42,6 +43,7 @@ enum AppSettings {
         static let requirePauseBeforeCommit = true
         static let insertTrailingSpace = true
         static let overlayBackgroundOpacity: Double = 0.72
+        static let useTransparency = true
         static let playSwipeAnimation = true
     }
 
@@ -118,6 +120,7 @@ enum AppSettings {
             Keys.requirePauseBeforeCommit: Defaults.requirePauseBeforeCommit,
             Keys.insertTrailingSpace: Defaults.insertTrailingSpace,
             Keys.overlayBackgroundOpacity: Defaults.overlayBackgroundOpacity,
+            Keys.useTransparency: Defaults.useTransparency,
             Keys.playSwipeAnimation: Defaults.playSwipeAnimation,
         ])
     }
@@ -135,6 +138,7 @@ enum AppSettings {
         defaults.removeObject(forKey: Keys.requirePauseBeforeCommit)
         defaults.removeObject(forKey: Keys.insertTrailingSpace)
         defaults.removeObject(forKey: Keys.overlayBackgroundOpacity)
+        defaults.removeObject(forKey: Keys.useTransparency)
         defaults.removeObject(forKey: Keys.playSwipeAnimation)
         defaults.synchronize()
     }
@@ -170,6 +174,10 @@ enum AppSettings {
 
     static var playSwipeAnimation: Bool {
         (UserDefaults.standard.object(forKey: Keys.playSwipeAnimation) as? Bool) ?? Defaults.playSwipeAnimation
+    }
+
+    static var useTransparency: Bool {
+        (UserDefaults.standard.object(forKey: Keys.useTransparency) as? Bool) ?? Defaults.useTransparency
     }
 
     static var debounceDelay: TimeInterval {
